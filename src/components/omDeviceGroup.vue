@@ -19,7 +19,7 @@
 <script>
   import OmCharts from './omCharts'
   var omDeviceCountData = {
-    data1:'56',
+    data1:'57',
     data2:'0',
     data1name:'当前群组',
     data2name:'其他群组',
