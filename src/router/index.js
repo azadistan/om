@@ -1,6 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import omMainPage from '@/omMainPage'
+import pmSearchMainPage from '@/pmSearchMainPage'
 
 Vue.use(Router)
 
@@ -9,8 +9,8 @@ export default new Router({
   routes: [
     {
       path: '/',
-      name: 'omMainPage',
-      component: omMainPage
+      name: 'pmSearchMainPage',
+      component: pmSearchMainPage
     }
   ]
 })
