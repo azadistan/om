@@ -1,43 +1,61 @@
 <template>
   <div style="width:26.25rem;margin:0rem 0 1rem 0px;float: bottom;border-top:#e0e0e0 solid 1px;">
-    <div @click="changeFn()" style="height:6rem;width:15rem;background:#EDEDED;margin:auto;margin-top:0.5rem;text-align:center" >
-      <input id="files" style="display: none" type="file" @change="importFile()" />
-      <img src="../assets/upload.png" style="width:2rem;margin-top:0.5rem" />
+    <input id="files" style="display: none" type="file" ref="clearFile" @change="importFile()" />
+    <div  class="dropbox p-3" id="dragBox" @click="changeFn()" style="height:7rem;width:18rem;background:#EDEDED;margin:auto;margin-top:1rem;text-align:center;border:1px dashed rgba(0,0,0,0.15)" >
+      <img src="../assets/upload.png" style="width:2rem;margin-top:1rem" />
       <h1 class=" font-weight-light" style="font-size:1rem;font-family:'微软雅黑'">
-        点击或拖拽上传zip文件
+        点击或将文件拖拽到这里上传
       </h1>
       <h1 class=" font-weight-light" style="font-size:0.5rem;font-family:'微软雅黑'">
         支持扩展名.zip .kml
       </h1>
     </div>
-    <div v-if="showPrise">
-      <h1 class=" font-weight-light" style="font-size:0.5rem;margin-left: 1rem;margin-top: 1rem;">
-        {{message}}
-      </h1>
-      <v-progress-linear v-model="valueDeterminate" style="width: 25rem;margin:0 auto"
+    <div id="uploadedBox" style="display:none;height:7rem;width:18rem;margin:auto;margin-top:1rem;text-align:center;" >
+      <div style="height:4rem;width:18rem;background:#EDEDED;border:1px dashed rgba(0,0,0,0.15);font-size:1rem;font-family:'微软雅黑'">
+        <div style="float: left">
+          <v-icon medium color="primary" style="margin: 0.8rem 0 0 2.2rem;">folder_open</v-icon>
+        </div>
+        <div class=" font-weight-light" style="float: left;margin: 1.1rem 0 0 0.5rem;font-size:1rem;font-family:'微软雅黑'">
+          <span>    </span><span id="fileName"></span>
+        </div>
+      </div>
 
-      ></v-progress-linear>
-    </div>
-    <div style="width:25.5rem;float: bottom;margin-bottom: 1rem">
-      <v-btn
-        :loading="loading"
-        :disabled="loading"
-        flat color="primary"
-        @click.native="loader = 'loading'"
-        @click="upload()"
-        style="margin-left: 9.45rem;"
-      >
-        上传
-      </v-btn>
+      <div style="float: left;margin-top: 1rem">
+        <v-btn
+          flat color="primary"
+          @click="fileRun()"
+          style="font-size:0.75rem;margin-top:0rem;margin-left:2rem;height: 2rem;"
+        >
+          确定
+        </v-btn>
+        <v-btn
+          flat color="primary"
+          @click="fileClear()"
+          style="font-size:0.75rem;margin-top:0rem;margin-left:0rem;height: 2rem;"
+        >
+          重置
+        </v-btn>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+  import * as omnivore from '@mapbox/leaflet-omnivore/index'
+  import * as JSZip from 'jszip'
+  import '../leaflet.shpfile.js'
+  import '../shp.js'
+  var mapItems = new L.FeatureGroup();
+  var filename="";
+  var geoJSON=new Array();
+  var geoString = ""
+
   export default {
     name: 'pm-upload-files',
     data(){
       return{
+        geoJSON1:[],
+        geoString1:this.changeGeoString(),
         valueDeterminate: 0,
         showPrise: false,
         showAll: true,
@@ -57,125 +75,249 @@
           xls: 'mdi-file-excel'
         },
         tree: [],
-        items: []
+        items: [],
       }
+    },
+    mounted: function () {
+      var dropbox = document.querySelector('.dropbox');
+      dropbox.addEventListener('dragenter', this.onDrag, false);
+      dropbox.addEventListener('dragover', this.onDrag, false);
+      dropbox.addEventListener('drop', this.onDrop, false);
     },
     methods: {
-
       changeFn: function () {
-        //alert("aa");
-        // `this` 在方法里指向当前 Vue 实例
-        files.click();
-        //this.showPrise=true;
-        // `event` 是原生 DOM 事件
-
+        document.getElementById("files").click();
       },
-      upload:function () {
+      importFile:function () {
         var selectedFile = document.getElementById("files").files[0];//获取读取的File对象
-        let param = new FormData()  // 创建form对象
-        param.append('file', selectedFile, selectedFile.name)  // 通过append向form对象添加数据
-        param.append('chunk', '0') // 添加form表单中其他数据
-        var config1 = {
-          onUploadProgress: progressEvent => {
-            this.valueDeterminate = (progressEvent.loaded / progressEvent.total * 80)
-            //this.progress = complete
-          }
-        }
-        // 添加请求头
-        axios.post('http://192.168.20.7:8078/uploadThemeticProduct', param,config1)
-          .then(resp => {
-            //alert(resp.data.message);
-            this.suss=1;
-            this.valueDeterminate=100;
-            this.showAll=false;
-            // this.$store.show = false;
-            this.$store.commit('change',1);
-            this.$store.commit('fileInfoChange',resp.data.data);
-            for(var i=0;i<resp.data.data.directory.length;i++)
-            {
-              this.items.push({name:resp.data.data.directory[i].directoryName,children:[]});
-              for(var j=0;j<resp.data.data.directory[i].fileListInDirectory.length;j++)
-              {
-                this.items[i].children.push({name:resp.data.data.directory[i].fileListInDirectory[j]})
+        filename = this.omitName(selectedFile.name);
+        this.fileReader(selectedFile);
+      },
+      clearFile() {
+        this.$refs.clearFile.value = ''; // 清空file文件
+      },
+      fileReader:function (file){
+        console.log(file);
+        geoJSON = undefined;
+        geoString = "";
+        if(file.name.slice(-3) === "kml") {
+          document.getElementById('uploadedBox').style.display=''
+          document.getElementById('dragBox').style.display='none'
+          document.getElementById('fileName').innerText = filename
+          var reader = new FileReader();
+          console.log(file.size);
+          reader.onload = function () {
+            console.log("loadright");
+            // uploaded();
+            if(reader.readyState != 2 || reader.error){
+              console.log("readererr");
+              return;
+            }
+            else{
+              var customLayer=L.geoJSON(null,{fill:false});
+              console.log(reader.result);
+              var kmlLayer = omnivore.kml(reader.result,null,customLayer)
+                .on('ready',function(e){
+                  console.log("kmlright");
+                  var tempGeoJSON = e.target.toGeoJSON();
+                  console.log(tempGeoJSON);
+                  if (tempGeoJSON.features.length === 1 && tempGeoJSON.features[0].geometry.type=="Polygon") { //1个feature
+                    geoString = JSON.stringify(tempGeoJSON.features[0].geometry)
+                    geoJSON = tempGeoJSON.features[0].geometry
+                    this.changeGeoString()
+                  }
+                  else {
+                    var j = 0;
+                    var  myGeoJSON = new Object();
+                    myGeoJSON.type = "Polygon";
+                    myGeoJSON.coordinates = new Array();
+                    for (var i = 0; i < tempGeoJSON.features.length; i++)
+                    {
+                      if (tempGeoJSON.features[i].geometry.type === "Polygon" || tempGeoJSON.features[i].geometry.type === "MultiPolygon"){
+                        geoString=JSON.stringify(tempGeoJSON.features[i].geometry);
+                        if(typeof(tempGeoJSON.features[0].geometry.coordinates[0]) === "object") {
+                          myGeoJSON.coordinates.push(tempGeoJSON.features[i].geometry.coordinates);
+                        }
+                        else {
+                          myGeoJSON.coordinates.push(tempGeoJSON.features[i].geometry.coordinates[0]);
+                        }
+                        j++;
+                        if(j >1){
+                          myGeoJSON.type = "MultiPolygon";
+                        }
+                      }
+                    }
+                    geoJSON=myGeoJSON;
+                    console.log(geoJSON);
+                  }
+                })
               }
+
             }
-            for(var i=0;i<resp.data.data.file.length;i++)
-            {
 
-              this.items.push({name:resp.data.data.file[i]});
+
+          reader.readAsDataURL(file);//将file文件编码成DATAUrl
+        }
+        else if(file.name.slice(-3) === "zip"){
+          var reader = new FileReader();
+          console.log(file.size);
+          var a = 0,b = 0,c = 0, d = 0;
+          reader.onload = function() {
+            document.getElementById('uploadedBox').style.display=''
+            document.getElementById('dragBox').style.display='none'
+            document.getElementById('fileName').innerText = filename
+            console.log("loaded");
+            if (reader.readyState != 2 || reader.error) {
+              console.log("error");
+              return;
             }
-            //alert(this.items);
-
-          }).catch(err => {             //
-          alert('请求失败：'+err.status+','+err.statusText);
-        });
-
+            else {
+              JSZip.loadAsync(reader.result)
+                .then(function (zip) {
+                  var files = zip.file(/.+/);
+                  files.forEach(function (x) {
+                    if (x.name.slice(-3).toLowerCase() === 'dbf') {
+                      a = 1;
+                    }
+                    if (x.name.slice(-3).toLowerCase() === 'shx') {
+                      b = 1;
+                    }
+                    if (x.name.slice(-3).toLowerCase() === 'shp') {
+                      c = 1;
+                    }
+                    if (x.name.slice(-3).toLowerCase() === 'prj') {
+                      d = 1;
+                    }
+                  });
+                  return a*b*c*d;
+                })
+                .then(function success(bool){
+                  if(bool){
+                    var shpfile = new L.Shapefile(reader.result,{fill:false}, {
+                      onEachFeature: function (feature, layer) {
+                        var holder = [];
+                      },
+                      style: function (feature) {
+                        return {color: "blue"}
+                      }
+                    });
+                    shpfile.addTo(mapItems);
+                    shpfile.once("data:loaded",function(e){
+                      var tempGeoJSON = e.target.toGeoJSON();
+                      console.log(tempGeoJSON);
+                      if (tempGeoJSON.features.length === 1 ) {
+                        if( tempGeoJSON.features[0].geometry.type=="Polygon"){
+                          geoString = JSON.stringify(tempGeoJSON.features[0].geometry)
+                          geoJSON = tempGeoJSON.features[0].geometry;
+                        }
+                        else if(tempGeoJSON.features[0].geometry.type=="MultiPolygon"){
+                          var  myGeoJSON = new Object();
+                          myGeoJSON.type = "Polygon";
+                          myGeoJSON.coordinates = new Array();
+                          for(var m=0;m<tempGeoJSON.features[0].geometry.coordinates.length;m++){
+                            myGeoJSON.coordinates.push(tempGeoJSON.features[0].geometry.coordinates[i]);
+                          }
+                          geoJSON=myGeoJSON;
+                        }
+                      }
+                      else if(tempGeoJSON.features.length > 1){
+                        console.log(tempGeoJSON);
+                        var j = 0;
+                        var  myGeoJSON = new Object();
+                        myGeoJSON.type = "Polygon";
+                        myGeoJSON.coordinates = new Array();
+                        for (var i = 0; i < tempGeoJSON.features.length; i++)
+                        {
+                          if (tempGeoJSON.features[i].geometry.type === "Polygon" || tempGeoJSON.features[i].geometry.type === "MultiPolygon"){
+                            geoString=JSON.stringify(tempGeoJSON.features[i].geometry)
+                            if(typeof(tempGeoJSON.features[0].geometry.coordinates[0]) === "object") {
+                              myGeoJSON.coordinates.push(tempGeoJSON.features[i].geometry.coordinates);
+                            }
+                            else {
+                              myGeoJSON.coordinates.push(tempGeoJSON.features[i].geometry.coordinates[0]);
+                            }
+                            j++;
+                            if(j >1){
+                              myGeoJSON.type = "MultiPolygon";
+                            }
+                          }
+                        }
+                        geoJSON=myGeoJSON;
+                        console.log(geoJSON);
+                      }
+                      else{
+                      }
+                    });
+                  }else{
+                    alert('该zip文件不符合文件格式要求，请点击重置清空文件缓存')
+                  }
+                });
+            }
+          }
+          reader.readAsArrayBuffer(file);
+        }
+        else{console.log(file.name.slice(-3))}
+      },
+      fileClear:function (){
+        this.geoString1=""
+        geoJSON=""
+        geoString=[]
+        this.$store.commit('geoJsonChange','')
+        this.$store.commit('mapResetChange',1)
+        document.getElementById('uploadedBox').style.display='none'
+        document.getElementById('dragBox').style.display=''
+        filename = ""
+        this.clearFile()
+      },
+      changeGeoString:function () {
+        return geoString
+      },
+      fileRun:function () {
+        if(this.geoString1 === geoString){this.$store.commit('dialogChange',[true,'文件上传缓存未清除，请点击重置按钮'])}
+        else{
+          this.geoString1 =geoString
+        }
 
       },
-      importFile: function () {
-
-        var selectedFile = document.getElementById("files").files[0];//获取读取的File对象
-        var filename =selectedFile.name;
-        //alert(filename);
-        this.message=filename;
-        //alert(this.message);
-        //console.log(filename);
-        //fileReader(selectedFile);
-        // `this` 在方法里指向当前 Vue 实例
-        //files.click();
-        this.showPrise=true;
-        // `event` 是原生 DOM 事件
+      onDrag: function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      onDrop: function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
+        e.preventDefault();
+        var selectedFile = e.dataTransfer.files[0]
+        filename =selectedFile.name;
+        console.log(filename);
+        this.fileReader(selectedFile);
 
       },
-      aa: function (a) {
-        // alert(this.items);
-        //alert( this.items.indexOf(a,0));
-        var index=this.items.indexOf(a,0);
-        this.$store.commit('infoShowChange',index);
-        //alert(a);
-      }
-
+      omitName (str) {
+        var realLength = 0, len = str.length, charCode = -1;
+        for (var i = 0; i < len; i++) {
+          charCode = str.charCodeAt(i);
+          if (charCode >= 0 && charCode <= 128) realLength += 1;
+          else realLength += 2;
+        }
+        if (realLength > 12) {
+          return str.substring(0, 10) + "...zip"
+          return str
+        }
+        else
+          return str
+      },
     },
     watch: {
-      loader () {
-        const l = this.loader
-        this[l] = !this[l]
-
-        //setTimeout(() => (this[l] = false), 3000)
-
-        // this.loader = null
-      },
-      suss:{
-        handler(){
-          //alert("aa");
-          const l = this.loader
-          this[l] = !this[l]
-          this.loader = null
-
+      geoString1:{
+        handler:function(val){
+          this.$store.commit('geoJsonChange',val)
+          this.$store.commit('mapResetChange',0)
         }
-      }
+      },
     },
     computed: {
-      autoTop () {
-        //alert(this.$store.state.scrollTop1);
-        //if(this.$store.state.scrollTop1>100)
-        // {
-        // this.aaa=54;
-        // return this.$store.state.scrollTop1 +140;
-        // }
-        // else {
-        //this.aaa=48;
-        return this.$store.state.scrollTop1 + 140
-        //  }
-      },
-      autoWidth () {
-        //this.aaa=(this.$store.state.clientWidth1-1519)/175*(-1)-3.2;
-        //alert(this.$store.state.clientWidth1);
-        return (this.$store.state.clientWidth1-1519)/1.06+683
-      },
-      autoHeight () {
-        return this.$store.state.clientHeight1 -230;
-      }
     }
   }
 </script>

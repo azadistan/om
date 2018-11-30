@@ -2,7 +2,7 @@
   "name": "om",
   "version": "1.0.0",
   "description": "A Vue.js project",
-  "author": "Blaze",
+  "author": "SD",
   "private": true,
   "scripts": {
     "dev": "webpack-dev-server --inline --progress --config build/webpack.dev.conf.js",
@@ -11,9 +11,16 @@
     "build": "node build/build.js"
   },
   "dependencies": {
+    "@mapbox/leaflet-omnivore": "^0.3.4",
+    "@turf/turf": "^5.1.6",
     "axios": "^0.18.0",
     "echarts": "^4.2.0-rc.2",
+    "file-saver": "^2.0.0",
+    "jszip": "^3.1.5",
+    "leaflet-draw": "^1.0.4",
     "material-design-icons-iconfont": "^3.0.3",
+    "qs": "^6.5.2",
+    "shapefile": "^0.6.6",
     "vue": "^2.5.2",
     "vue-resource": "^1.5.1",
     "vue-router": "^3.0.1",

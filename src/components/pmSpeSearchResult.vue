@@ -1,18 +1,25 @@
 <template>
-  <div style="width:30.25rem;margin:0px 0 20rem 0px;float:bottom; border-top:#e0e0e0 solid 1px;">
+  <div style="width:30.25rem;height:42rem;margin:0px 0 0.5rem 0px;float:bottom; border-top:#e0e0e0 solid 1px;">
   <v-data-table
     v-model="selected"
     :headers="headers"
-    :items="desserts"
+    :items="speResults"
     :pagination.sync="pagination"
+    :rows-per-page-items="[100000]"
     select-all
-    item-key="name"
-    class="elevation-1"
+    item-key="speId"
     hide-actions
+    headers-length="4"
+    style="height: 38.4rem"
   >
+    <template slot="no-data">
+      <v-alert :value="true" color="error" icon="warning" outline>
+        对不起，没有符合条件的查询结果
+      </v-alert>
+    </template>
     <template slot="headers" slot-scope="props">
-      <tr>
-        <th>
+      <tr style="border-bottom: 1px solid #C5C5C5">
+        <th style="padding: 0 -10px 0 0">
           <v-checkbox
             :input-value="props.all"
             :indeterminate="props.indeterminate"
@@ -24,31 +31,46 @@
         <th
           v-for="header in props.headers"
           :key="header.text"
-          style="padding: 0 2.5rem 0 1rem"
+          style="padding: 0 2.5rem 0 0"
         >
           {{ header.text }}
         </th>
-        <v-btn small color="primary" dark style="margin:1rem 1rem 0 2rem">批量下载</v-btn>
+        <th
+          :key="speId"
+        >
+          <div style="background:#1978CB;color: white;height: 1.5rem;width: 5rem;cursor: pointer" @click="speMutiDownload()" href="javascript:;" rel="external nofollow">批量下载</div>
+        </th>
       </tr>
     </template>
-    <template slot="items" slot-scope="props">
-      <tr :active="props.selected" @click="props.selected = !props.selected">
-        <td>
+    <template slot="items" slot-scope="props" v-model="speResults">
+      <tr >
+        <td :active="props.selected" @click="props.selected = !props.selected">
           <v-checkbox
             :input-value="props.selected"
             primary
             hide-details
-            style="margin: 2px 0rem 0 0rem;"
+            style="margin: 0px 0rem 0 0rem;"
           ></v-checkbox>
         </td>
+
+      <td :title=props.item.speName style="padding: 0 0rem 0 0rem;">{{omitName(props.item.speName)}}</td>
+      <td :title=props.item.speIndustry style="padding: 0 0rem 0 0rem">{{ omitName(props.item.speIndustry) }}</td>
+      <td
+      >
+        <span style="color: #1978CB;cursor: pointer" @click="speDetailsClick(props.item.speId)">详情</span>
+        <span>  |  </span>
+        <span :title=props.item.speDownload class="speDownload" style="color: #1978CB;cursor: pointer"@click="speDownloadClick(props.item.speDownload)">下载</span>
+      </td>
       </tr>
-      <td :title=props.item.name style="padding: 0 1.2rem 0 0rem;">{{omitName(props.item.name)}}</td>
-      <td :title=props.item.calories style="padding: 0 0rem 0 1rem">{{ omitName(props.item.calories) }}</td>
-      <div style="float: left;margin:0 -0.2rem 0.2rem 2.5rem;color: #1978CB;">详情</div>
-      <div style="float: left;margin:0.3rem 0 0 0;width:1rem;height:1rem;border-right:#e0e0e0 solid 1px;"></div>
-      <div style="float: left;margin:0 0 0 0.5rem;color: #1978CB">下载</div>
     </template>
   </v-data-table>
+    <div class="text-xs-center" style="margin-top: 0.5rem">
+      <v-pagination
+        v-model="page"
+        :length="pageTotal"
+        :total-visible="7"
+      ></v-pagination>
+    </div>
   </div>
 </template>
 
@@ -57,66 +79,155 @@
     name: 'pm-spe-search-result',
     data(){
      return{
+       page:1,
+       pageTotal:1,
+       speIdNow:'',
+       speCheckbox:'',
        seen:false,
        pagination: {
-         sortBy: 'name'
+         sortBy: 'speId'
        },
        selected: [],
        headers: [
          {
            text: '专题名称',
            align: 'left',
-           value: 'name'
+           value: 'speName'
          },
-         { text: '所属行业', value: 'calories' }
+         { text: '所属行业', value: 'speIndustry' }
        ],
-       desserts: [
+       speResults1: [
          {
+           speId:1,
            value: false,
-           name: '长春热岛效应',
-           calories: "农业 林业 畜牧业"
+           speName: '长春热岛效应1',
+           speIndustry: "农业 林业 畜牧业",
+           speDownload: "http://192.168.20.7:8079/专题产品/长春市201309热岛效应test/4/长春热岛201607.tfw"
          },
          {
+           speId:2,
            value: false,
-           name: '吉林热岛效应',
-           calories: "农业 林业 畜牧业"
+           speName: '吉林热岛效应4',
+           speIndustry: "农业 林业 畜牧业",
+           speDownload: "http://192.168.20.7:8079/专题产品/长春市201309热岛效应test/长春市201309热岛效应test.zip"
          },
          {
+           speId:3,
            value: false,
-           name: '北京热岛效应111',
-           calories: "农业 林业 畜牧业"
+           speName: '北京热岛效应5',
+           speIndustry: "农业 林业 畜牧业",
+           speDownload: "http://192.168.20.7:8079/专题产品/长春市201309热岛效应test/4/长春热岛201607.tfw"
          },
          {
+           speId:4,
            value: false,
-           name: 'Ice111111111',
-           calories: "1111111"
+           speName: 'Ice111111111',
+           speIndustry: "1111111",
+           speDownload: "http://192.168.20.7:8079/专题产品/长春市201309热岛效应test/长春市201309热岛效应test.zip"
          },
-       ]
+         {
+           speId:5,
+           value: false,
+           speName: '长春热岛效应2',
+           speIndustry: "农业 林业 畜牧业",
+           speDownload: "http://192.168.20.7:8079/专题产品/长春市201309热岛效应test/长春市热岛效应产品.pdf"
+         },
+         {
+           speId:6,
+           value: false,
+           speName: '长春热岛效应3',
+           speIndustry: "农业 林业 畜牧业",
+           speDownload: "http://192.168.20.7:8079/专题产品/长春市201309热岛效应test/4/长春热岛201607.tfw"
+         },
+       ],
+       speResults:[]
      }
     },
     mounted(){
     },
     methods: {
       toggleAll () {
-        if (this.selected.length) this.selected = []
-        else this.selected = this.desserts.slice()
+        if (this.selected.length === this.speResults.length) {
+          this.selected = []
+        }
+
+        else {
+          this.selected = this.speResults.slice()
+        }
       },
-      omitName(str){
+      omitName (str) {
         var realLength = 0, len = str.length, charCode = -1;
         for (var i = 0; i < len; i++) {
           charCode = str.charCodeAt(i);
           if (charCode >= 0 && charCode <= 128) realLength += 1;
           else realLength += 2;
         }
-        if(realLength>12){
-           return str.substring(0, 5)+"..."
+        if (realLength > 12) {
+          return str.substring(0, 5) + "..."
           return str
         }
         else
           return str
       },
+      speDownloadClick (url) {
+        window.open(url);
+      },
+      speMutiDownload () {
+        var length = this.selected.length
+        if(length === 0){alert("请选择至少一个产品进行下载")}
+        for (var i = 0; i < length; i++) {
+          var link = document.createElement('a')
+          link.setAttribute('download', '')
+          link.href = this.selected[i].speDownload
+          link.click()
+        }
 
-    }
+      },
+      speDetailsClick(id){
+        alert(id)
+      }
+    },
+    watch:{
+      speResultsChange: {
+        handler () {
+          this.selected = []
+          this.speResults = this.$store.state.speResultsNow
+        },
+        deep: true
+      },
+      selected:{
+        handler:function(val){
+
+          var length = val.length
+          var speGeoJson = []
+          for(var i=0;i<length;i++){
+            speGeoJson.push(val[i].speGeoJson)
+          }
+          this.$store.commit('speGeoJsonSelectChange',speGeoJson)
+        }
+      },
+      spePageTotalChange:{
+        handler () {
+          this.pageTotal = this.$store.state.spePageTotalNow
+        },
+        deep: true
+      },
+      page:{
+        handler (val) {
+          this.$store.commit('spePageChange',val)
+        },
+        deep: true
+      },
+    },
+    computed:{
+      speResultsChange:function () {
+        return this.$store.state.speResultsNow
+      },
+      spePageTotalChange:function () {
+        return this.$store.state.spePageTotalNow
+      },
+    },
+
   }
 </script>
 
